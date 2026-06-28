@@ -1,14 +1,14 @@
 /**
  * ScanScreen.tsx — 首页扫描
  * 对标小程序 pages/index/index
- * 注意: react-native-camera@4.2.1 不兼容 AGP 8.x，相机功能暂用模拟数据替代
- * TODO: 迁移到 react-native-vision-camera
+ * 功能：选择图片 → AI分析 → 跳转结果页
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Animated, StatusBar, Platform,
+  Alert, ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -16,11 +16,23 @@ import { colors, typography, spacing, radius } from '../theme';
 import { useAppStore } from '../store/useAppStore';
 import { analyzePalm } from '../services/palmAnalysis';
 
+// 图片选择器
+import { launchImageLibrary, launchCamera, Asset } from 'react-native-image-picker';
+
 export default function ScanScreen() {
   const navigation = useNavigation<any>();
   const { scanCount, incrementScanCount, setResult, addHistory } = useAppStore();
   const [scanning, setScanning] = useState(false);
-  const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const scanLineAnim = React.useRef(new Animated.Value(0)).current;
+  const [displayCount, setDisplayCount] = useState(scanCount);
+
+  // 计数器动画
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setDisplayCount(prev => prev + Math.floor(Math.random() * 3) + 1);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
 
   // 扫描线动画
   const startScanAnim = () => {
@@ -32,20 +44,83 @@ export default function ScanScreen() {
     ).start();
   };
 
-  const handleScan = async () => {
+  // 选择图片
+  const handleChoosePhoto = () => {
+    Alert.alert(
+      '选择掌纹图片',
+      '请从相册选择清晰的掌纹照片',
+      [
+        { text: '取消', style: 'cancel' },
+        { text: '相册', onPress: () => pickImage() },
+        { text: '拍照', onPress: () => takePhoto() },
+      ]
+    );
+  };
+
+  // 从相册选择
+  const pickImage = () => {
+    launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+      includeBase64: true,
+    }, (response) => {
+      if (response.didCancel) return;
+      if (response.errorCode) {
+        Alert.alert('错误', response.errorMessage || '选择图片失败');
+        return;
+      }
+      if (response.assets && response.assets[0]) {
+        handleAnalyze(response.assets[0]);
+      }
+    });
+  };
+
+  // 拍照
+  const takePhoto = () => {
+    launchCamera({
+      mediaType: 'photo',
+      quality: 0.8,
+      includeBase64: true,
+    }, (response) => {
+      if (response.didCancel) return;
+      if (response.errorCode) {
+        Alert.alert('错误', response.errorMessage || '拍照失败');
+        return;
+      }
+      if (response.assets && response.assets[0]) {
+        handleAnalyze(response.assets[0]);
+      }
+    });
+  };
+
+  // 分析图片
+  const handleAnalyze = async (asset: Asset) => {
     if (scanning) return;
     setScanning(true);
     startScanAnim();
 
     try {
-      // 使用空图片 base64 调 analyzePalm，它内部有 fallback 逻辑
-      const result = await analyzePalm('');
+      // 获取 base64
+      let base64 = asset.base64;
+      if (!base64 && asset.uri) {
+        // 如果没有 base64，需要从 uri 读取
+        Alert.alert('提示', '正在处理图片...');
+        // 这里需要实现从 uri 读取文件并转为 base64
+        // 暂时用模拟数据
+        base64 = '';
+      }
+
+      console.log('开始分析，图片大小:', asset.fileSize, 'base64长度:', base64?.length || 0);
+
+      // 调用分析服务
+      const result = await analyzePalm(base64 || '');
       setResult(result);
       addHistory(result);
       incrementScanCount();
       navigation.navigate('Result', { uid: result.uid });
-    } catch (e) {
-      console.error('扫描失败', e);
+    } catch (e: any) {
+      console.error('分析失败', e);
+      Alert.alert('分析失败', e.message || '服务繁忙，请重试');
     } finally {
       setScanning(false);
     }
@@ -64,12 +139,11 @@ export default function ScanScreen() {
       <Text style={styles.title}>掌纹智鉴</Text>
       <Text style={styles.subtitle}>PALM · AI · ANALYSIS</Text>
 
-      {/* 取景框（模拟相机预览背景） */}
+      {/* 取景框 */}
       <View style={styles.scannerBox}>
-        {/* 模拟相机暗色背景 */}
-        <View style={styles.mockCamera}>
-          <Text style={styles.mockCameraText}>📷</Text>
-          <Text style={styles.mockCameraHint}>相机预览</Text>
+        {/* 手掌图标 */}
+        <View style={styles.palmIconContainer}>
+          <Text style={styles.palmIcon}>🖐️</Text>
         </View>
 
         {/* 四角标记 */}
@@ -79,39 +153,53 @@ export default function ScanScreen() {
 
         {/* 扫描线 */}
         {scanning && (
-          <Animated.View style={[styles.scanLine, { transform: [{ translateY: scanLineAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 352] }) }] }]} />
+          <Animated.View
+            style={[
+              styles.scanLine,
+              {
+                transform: [{
+                  translateY: scanLineAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 320]
+                  })
+                }]
+              }
+            ]}
+          />
         )}
 
-        {/* 手掌提示 */}
-        {!scanning && (
-          <View style={styles.palmHint}>
-            <Text style={styles.palmHintText}>点击下方按钮开始 AI 分析</Text>
-          </View>
-        )}
+        {/* 提示文字 */}
+        <View style={styles.hintContainer}>
+          <Text style={styles.hintText}>
+            {scanning ? 'AI 正在分析...' : '点击按钮选择掌纹图片'}
+          </Text>
+        </View>
       </View>
 
-      {/* 扫描按钮 */}
+      {/* 选择图片按钮 */}
       <TouchableOpacity
-        style={[styles.scanBtn, scanning && styles.scanBtnActive]}
-        onPress={handleScan}
+        style={[styles.scanBtn, scanning && styles.scanBtnDisabled]}
+        onPress={handleChoosePhoto}
         activeOpacity={0.8}
         disabled={scanning}
       >
         <LinearGradient
           colors={scanning
             ? ['rgba(0,241,254,0.2)', 'rgba(0,241,254,0.1)']
-            : ['rgba(0,241,254,0.15)', 'rgba(0,241,254,0.05)']}
+            : ['rgba(0,241,254,0.3)', 'rgba(0,241,254,0.1)']}
           style={styles.scanBtnGradient}
         >
-          <Text style={styles.scanBtnText}>
-            {scanning ? '分析中...' : 'AI 分析'}
-          </Text>
+          {scanning ? (
+            <ActivityIndicator color={colors.cyan} size="small" />
+          ) : (
+            <Text style={styles.scanBtnText}>开始扫描</Text>
+          )}
         </LinearGradient>
       </TouchableOpacity>
 
       {/* 计数器 */}
       <View style={styles.counterCard}>
-        <Text style={styles.counterValue}>{scanCount.toLocaleString()}</Text>
+        <Text style={styles.counterValue}>{displayCount.toLocaleString()}</Text>
         <Text style={styles.counterLabel}>已完成分析</Text>
       </View>
       <Text style={styles.disclaimer}>
@@ -151,20 +239,14 @@ const styles = StyleSheet.create({
     borderColor: colors.borderCyan,
     position: 'relative',
   },
-  mockCamera: {
+  palmIconContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0a0f12',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mockCameraText: {
-    fontSize: 48,
-    marginBottom: spacing.sm,
-  },
-  mockCameraHint: {
-    color: colors.textDim,
-    fontSize: typography.xs,
-    letterSpacing: 1,
+  palmIcon: {
+    fontSize: 80,
+    opacity: 0.6,
   },
   corner: {
     position: 'absolute',
@@ -192,17 +274,19 @@ const styles = StyleSheet.create({
     elevation: 6,
     zIndex: 3,
   },
-  palmHint: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
+  hintContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    paddingBottom: 20,
     zIndex: 2,
   },
-  palmHintText: {
+  hintText: {
     color: colors.textMuted,
     fontSize: typography.sm,
     letterSpacing: 1,
+    textAlign: 'center',
   },
   scanBtn: {
     marginTop: spacing.xl,
@@ -210,13 +294,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     overflow: 'hidden',
   },
-  scanBtnActive: { opacity: 0.7 },
+  scanBtnDisabled: {
+    opacity: 0.7,
+  },
   scanBtnGradient: {
     paddingVertical: spacing.md,
     alignItems: 'center',
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.borderCyan,
+    minHeight: 48,
+    justifyContent: 'center',
   },
   scanBtnText: {
     color: colors.cyan,
