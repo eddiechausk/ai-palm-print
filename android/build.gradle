@@ -46,6 +46,7 @@ subprojects { subproject ->
         resolutionStrategy {
             force "com.facebook.react:react-android:${rootProject.ext.reactNativeVersion}"
             force "com.facebook.react:hermes-android:${rootProject.ext.reactNativeVersion}"
+            force "androidx.core:core-ktx:1.12.0"
         }
         resolutionStrategy.eachDependency { DependencyResolveDetails details ->
             if (details.requested.group == 'com.facebook.react' && details.requested.name == 'react-native') {
