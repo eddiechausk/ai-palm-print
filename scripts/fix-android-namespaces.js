@@ -1,12 +1,13 @@
 /**
- * postinstall script: Fix missing namespace in third-party Android libraries
- * Required for AGP 8.x compatibility
+ * postinstall script: Fix AGP 8.x namespace compatibility in third-party libraries
  *
- * Libraries that need namespace added:
- * - react-native-linear-gradient (namespace already added in newer versions, but ensure it's present)
+ * AGP 8.x requires:
+ * - namespace declared in library's build.gradle
+ * - NO package attribute in library's AndroidManifest.xml
  *
- * Note: react-native-camera and react-native-iap are excluded from autolinking
- * via react-native.config.js, so their namespace issues don't affect the build.
+ * Libraries that need fixing:
+ * - react-native-linear-gradient
+ * - react-native-reanimated
  */
 
 const fs = require('fs');
@@ -14,43 +15,70 @@ const path = require('path');
 
 const fixes = [
   {
-    file: 'node_modules/react-native-linear-gradient/android/build.gradle',
-    check: 'namespace',
-    // Insert namespace after 'android {' line
-    pattern: /^(android\s*\{)/m,
-    replacement: '$1\n    namespace "com.reactnative.lineargradient"',
+    gradleFile: 'node_modules/react-native-linear-gradient/android/build.gradle',
+    manifestFile: 'node_modules/react-native-linear-gradient/android/src/main/AndroidManifest.xml',
+    namespace: 'com.reactnative.lineargradient',
+    packageName: 'com.BV.LinearGradient',
+  },
+  {
+    gradleFile: 'node_modules/react-native-reanimated/android/build.gradle',
+    manifestFile: 'node_modules/react-native-reanimated/android/src/main/AndroidManifest.xml',
+    namespace: 'com.swmansion.reanimated',
+    packageName: 'com.swmansion.reanimated',
   },
 ];
 
 const root = path.resolve(__dirname, '..');
-
 let fixCount = 0;
 
-for (const fix of fixes) {
-  const filePath = path.join(root, fix.file);
+function addNamespaceToGradle(filePath, ns) {
+  if (!fs.existsSync(filePath)) return false;
+  let content = fs.readFileSync(filePath, 'utf8');
+  if (content.includes(`namespace "${ns}"`)) return false;
 
-  if (!fs.existsSync(filePath)) {
-    console.log(`[fix-namespaces] SKIP (not found): ${fix.file}`);
-    continue;
+  // Insert namespace after 'android {' block opening
+  const match = content.match(/^(android\s*\{)/m);
+  if (match) {
+    content = content.replace(/^(android\s*\{)/m, `$1\n    namespace "${ns}"`);
+    fs.writeFileSync(filePath, content, 'utf8');
+    return true;
   }
-
-  const content = fs.readFileSync(filePath, 'utf8');
-
-  if (content.includes(fix.check)) {
-    console.log(`[fix-namespaces] OK (already fixed): ${fix.file}`);
-    continue;
-  }
-
-  const fixed = content.replace(fix.pattern, fix.replacement);
-
-  if (fixed === content) {
-    console.log(`[fix-namespaces] WARN (pattern not matched): ${fix.file}`);
-    continue;
-  }
-
-  fs.writeFileSync(filePath, fixed, 'utf8');
-  console.log(`[fix-namespaces] FIXED: ${fix.file}`);
-  fixCount++;
+  // If no android block found, prepend
+  content = `android {\n    namespace "${ns}"\n}\n\n` + content;
+  fs.writeFileSync(filePath, content, 'utf8');
+  return true;
 }
 
-console.log(`[fix-namespaces] Done. Fixed ${fixCount} file(s).`);
+function removePackageFromManifest(filePath, pkgName) {
+  if (!fs.existsSync(filePath)) return false;
+  let content = fs.readFileSync(filePath, 'utf8');
+  const pattern = new RegExp(`\\s*package="${pkgName}"\\s*`, 'g');
+  if (!pattern.test(content)) return false;
+  content = content.replace(pattern, ' ');
+  fs.writeFileSync(filePath, content, 'utf8');
+  return true;
+}
+
+for (const fix of fixes) {
+  const gradlePath = path.join(root, fix.gradleFile);
+  const manifestPath = path.join(root, fix.manifestFile);
+  let fixed = false;
+
+  if (addNamespaceToGradle(gradlePath, fix.namespace)) {
+    console.log(`[fix-ns] +namespace: ${fix.gradleFile}`);
+    fixed = true;
+  } else {
+    console.log(`[fix-ns] OK: ${fix.gradleFile}`);
+  }
+
+  if (removePackageFromManifest(manifestPath, fix.packageName)) {
+    console.log(`[fix-ns] -package: ${fix.manifestFile}`);
+    fixed = true;
+  } else {
+    console.log(`[fix-ns] OK: ${fix.manifestFile}`);
+  }
+
+  if (fixed) fixCount++;
+}
+
+console.log(`[fix-ns] Done. Fixed ${fixCount} lib(s).`);
