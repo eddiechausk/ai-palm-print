@@ -52,8 +52,8 @@ android {
 
 dependencies {
     // React Native core
-    implementation "com.facebook.react:react-android"
-    implementation "com.facebook.react:hermes-android"
+    implementation "com.facebook.react:react-android:${rootProject.ext.reactNativeVersion}"
+    implementation "com.facebook.react:hermes-android:${rootProject.ext.reactNativeVersion}"
 }
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)

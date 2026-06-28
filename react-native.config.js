@@ -7,14 +7,10 @@
 module.exports = {
   dependencies: {
     'react-native-camera': {
-      platforms: {
-        android: null,
-      },
+      platforms: { android: null },
     },
     'react-native-iap': {
-      platforms: {
-        android: null,
-      },
+      platforms: { android: null },
     },
   },
 };
