@@ -17,7 +17,7 @@ const fixes = [
   {
     gradleFile: 'node_modules/react-native-linear-gradient/android/build.gradle',
     manifestFile: 'node_modules/react-native-linear-gradient/android/src/main/AndroidManifest.xml',
-    namespace: 'com.reactnative.lineargradient',
+    namespace: 'com.BV.LinearGradient',
     packageName: 'com.BV.LinearGradient',
   },
   {
