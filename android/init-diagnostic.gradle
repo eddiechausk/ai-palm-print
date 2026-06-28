@@ -1,0 +1,80 @@
+// Diagnostic init script - checks bootClasspath provider status for all Android projects
+// This runs after all projects are evaluated but before task graph construction
+
+gradle.projectsEvaluated {
+    println "\n========== DIAGNOSTIC: Checking Android SDK Components =========="
+    rootProject.allprojects { project ->
+        if (project.plugins.hasPlugin('com.android.library') || project.plugins.hasPlugin('com.android.application')) {
+            println "\n--- Project: ${project.name} ---"
+            try {
+                def android = project.extensions.findByName('android')
+                if (android == null) {
+                    println "  android extension: NULL"
+                    return
+                }
+
+                // Try to access bootClasspath
+                try {
+                    def bc = android.bootClasspath
+                    if (bc != null) {
+                        println "  bootClasspath (raw): ${bc}"
+                        println "  bootClasspath files: ${bc.files}"
+                    } else {
+                        println "  bootClasspath: NULL"
+                    }
+                } catch (Exception e) {
+                    println "  bootClasspath ERROR: ${e.class.name}: ${e.message}"
+                }
+
+                // Try SDK components via reflection
+                try {
+                    def sdkComponents = android.sdkComponents
+                    if (sdkComponents != null) {
+                        println "  sdkComponents: ${sdkComponents.class.name}"
+                        try {
+                            def bootClasspathProvider = sdkComponents.bootClasspath
+                            println "  bootClasspathProvider: ${bootClasspathProvider}"
+                            println "  bootClasspathProvider present: ${bootClasspathProvider.present}"
+                            if (bootClasspathProvider.present) {
+                                def value = bootClasspathProvider.get()
+                                println "  bootClasspathProvider value: ${value}"
+                            }
+                        } catch (Exception e) {
+                            println "  bootClasspathProvider ERROR: ${e.class.name}: ${e.message}"
+                        }
+
+                        try {
+                            def sdkLoader = sdkComponents.sdkLoader
+                            println "  sdkLoader: ${sdkLoader}"
+                            println "  sdkLoader present: ${sdkLoader.present}"
+                        } catch (Exception e) {
+                            println "  sdkLoader ERROR: ${e.class.name}: ${e.message}"
+                        }
+                    } else {
+                        println "  sdkComponents: NULL"
+                    }
+                } catch (Exception e) {
+                    println "  sdkComponents access ERROR: ${e.class.name}: ${e.message}"
+                }
+
+                // Check compileSdkVersion
+                try {
+                    println "  compileSdkVersion: ${android.compileSdkVersion}"
+                } catch (Exception e) {
+                    println "  compileSdkVersion ERROR: ${e.message}"
+                }
+
+                // Check buildToolsVersion
+                try {
+                    println "  buildToolsVersion: ${android.buildToolsVersion}"
+                } catch (Exception e) {
+                    println "  buildToolsVersion ERROR: ${e.message}"
+                }
+
+            } catch (Exception e) {
+                println "  GENERAL ERROR: ${e.class.name}: ${e.message}"
+            }
+        }
+    }
+    println "\n========== END DIAGNOSTIC ==========\n"
+}

@@ -1,0 +1,19 @@
+// Debug init script to catch MissingValueException and print context
+allprojects {
+    configurations.all {
+        // Hook into dependency resolution
+        resolutionStrategy.eachDependency { details ->
+            // Log each dependency being resolved
+        }
+    }
+    
+    afterEvaluate { project ->
+        // Log all tasks and their dependencies for debug
+        project.tasks.withType(JavaCompile) { task ->
+            task.doFirst {
+                println "DEBUG: Running ${task.path}"
+                println "DEBUG: classpath count=${task.classpath.files.size()}"
+            }
+        }
+    }
+}

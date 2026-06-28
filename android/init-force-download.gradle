@@ -1,0 +1,17 @@
+// Init script to force-download all artifacts before task graph construction
+// This works around the MissingValueException in Gradle 8.3 where
+// BuildableBackedProvider returns null for undownloaded artifacts
+
+gradle.projectsLoaded {
+    rootProject.allprojects { project ->
+        project.afterEvaluate {
+            project.configurations.findAll { it.canBeResolved }.each { config ->
+                try {
+                    config.files
+                } catch (Exception e) {
+                    // Ignore - some configs may not be resolvable yet
+                }
+            }
+        }
+    }
+}

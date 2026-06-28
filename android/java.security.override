@@ -1,0 +1,4 @@
+# Override file to disable SunMSCAPI provider (avoids Windows Crypto API access)
+# This prevents Java from accessing C:\Users\Administrator\AppData\Roaming\Microsoft\Crypto\RSA
+security.provider.12=
+securerandom.strongAlgorithms=DRBG:SUN

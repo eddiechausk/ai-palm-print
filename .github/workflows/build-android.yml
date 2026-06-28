@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build Debug APK
+    name: Build APKs
     runs-on: ubuntu-latest
 
     steps:
@@ -57,22 +57,40 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build Debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+      # ── Generate JS bundle for Release (Metro bundler) ──
+      - name: Clean assets & create directories
+        run: |
+          # Remove stale Metro-generated drawables to avoid resource conflicts
+          rm -rf android/app/src/main/res/drawable-*
+          rm -rf android/app/src/main/res/raw
+          mkdir -p android/app/src/main/assets
 
-      - name: Upload Debug APK
+      - name: Bundle JS for Release
+        run: |
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res/ \
+            --reset-cache
+
+      - name: Build Release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: PalmAI-debug-${{ github.run_number }}
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 14
+          name: PalmAI-release-${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
           if-no-files-found: error
 
       - name: Output APK info
         run: |
-          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          APK="android/app/build/outputs/apk/release/app-release.apk"
           if [ -f "$APK" ]; then
             ls -lh "$APK"
-            echo "✅ APK 构建成功！可在 Actions > Artifacts 下载。"
+            echo "✅ Release APK 构建成功！JS Bundle 已打包，无需开发服务器即可运行！"
           fi

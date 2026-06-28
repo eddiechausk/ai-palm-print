@@ -1,0 +1,50 @@
+// Diagnostic init script to identify null providers in Android projects
+gradle.projectsEvaluated {
+    rootProject.allprojects { proj ->
+        if (proj.plugins.hasPlugin('com.android.application') || proj.plugins.hasPlugin('com.android.library')) {
+            try {
+                def androidExt = proj.extensions.findByName('android')
+                if (androidExt != null) {
+                    // Check bootClasspath
+                    try {
+                        def bootClasspath = androidExt.bootClasspath
+                        if (bootClasspath == null) {
+                            println "DIAGNOSIS: ${proj.name} - bootClasspath is NULL"
+                        } else {
+                            println "DIAGNOSIS: ${proj.name} - bootClasspath has ${bootClasspath.size()} entries"
+                            bootClasspath.each { f -> println "  -> ${f}" }
+                        }
+                    } catch (Exception e) {
+                        println "DIAGNOSIS: ${proj.name} - bootClasspath ERROR: ${e.message}"
+                    }
+
+                    // Check compileClasspath for the debug variant
+                    try {
+                        def config = proj.configurations.findByName('debugCompileClasspath')
+                        if (config != null) {
+                            def files = config.files
+                            println "DIAGNOSIS: ${proj.name} - debugCompileClasspath resolved with ${files.size()} files"
+                        } else {
+                            println "DIAGNOSIS: ${proj.name} - debugCompileClasspath is NULL"
+                        }
+                    } catch (Exception e) {
+                        println "DIAGNOSIS: ${proj.name} - debugCompileClasspath ERROR: ${e.message}"
+                    }
+
+                    // Check if there are any generated source dirs that might have null providers
+                    try {
+                        def mainSourceSet = androidExt.sourceSets.findByName('main')
+                        if (mainSourceSet != null) {
+                            def javaSrcDirs = mainSourceSet.java.srcDirs
+                            println "DIAGNOSIS: ${proj.name} - main java srcDirs: ${javaSrcDirs}"
+                        }
+                    } catch (Exception e) {
+                        println "DIAGNOSIS: ${proj.name} - sourceSets ERROR: ${e.message}"
+                    }
+                }
+            } catch (Exception e) {
+                println "DIAGNOSIS: ${proj.name} - FATAL: ${e.message}"
+            }
+        }
+    }
+}
