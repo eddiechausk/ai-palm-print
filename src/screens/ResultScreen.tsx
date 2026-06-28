@@ -1,63 +1,58 @@
 /**
  * ResultScreen.tsx — 分析报告
  * 对标小程序 pages/result/result
+ * 显示 AI 掌纹分析结果
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Animated,
+  TouchableOpacity, ActivityIndicator,
 } from 'react-native';
-import Svg, { Circle, Line, Polygon } from 'react-native-svg';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, typography, spacing, radius } from '../theme';
 import { useAppStore } from '../store/useAppStore';
-import { unlockReport } from '../services/palmAnalysis';
+import { unlockReport, getHistory } from '../services/palmAnalysis';
 import { purchase, PRODUCT_IDS } from '../services/payment';
 
-const DIMS = ['生命力', '智慧', '命运', '心灵'] as const;
-type Dim = typeof DIMS[number];
-
 export default function ResultScreen() {
-  const route     = useNavigation<any>();
+  const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const { currentResult, isVip } = useAppStore();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const { currentResult, isVip, setCurrentResult } = useAppStore();
+  const [loading, setLoading] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.04, duration: 1800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 1800, useNativeDriver: true }),
-      ]),
-    ).start();
-  }, []);
+  // 如果没有传入结果，尝试从 store 获取
+  const result = route.params?.result || currentResult;
 
-  if (!currentResult) return null;
+  if (!result) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emptyText}>暂无分析结果</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Scan')}>
+          <Text style={styles.backBtnText}>返回扫描</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-  const dims: Record<Dim, number> = {
-    生命力: currentResult.vitality,
-    智慧:   currentResult.wisdom,
-    命运:   currentResult.fate,
-    心灵:   currentResult.heart,
+  // 判断哪些部分已解锁
+  const isSectionUnlocked = (section: string) => {
+    return !result.lockedSections?.includes(section) || isVip;
   };
-
-  /** 雷达图多边形顶点 */
-  const radarPoints = (values: number[], cx = 75, cy = 75, r = 60) => {
-    return DIMS.map((_, i) => {
-      const angle = (Math.PI * 2 * i) / DIMS.length - Math.PI / 2;
-      const v = (values[i] ?? 0) / 100;
-      return { x: cx + r * v * Math.cos(angle), y: cy + r * v * Math.sin(angle) };
-    });
-  };
-
-  const pts = radarPoints(DIMS.map((d) => dims[d]));
-  const polyPoints = pts.map((p) => `${p.x},${p.y}`).join(' ');
 
   const handleUnlock = async () => {
-    const ok = await purchase(PRODUCT_IDS.UNLOCK_REPORT);
-    if (ok) {
-      await unlockReport(currentResult.uid);
+    setUnlocking(true);
+    try {
+      const ok = await purchase(PRODUCT_IDS.UNLOCK_REPORT);
+      if (ok) {
+        const unlocked = await unlockReport(result.reportId);
+        setCurrentResult(unlocked);
+      }
+    } catch (error) {
+      console.error('解锁失败:', error);
+    } finally {
+      setUnlocking(false);
     }
   };
 
@@ -67,191 +62,232 @@ export default function ResultScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-
       {/* 标题 */}
-      <Text style={styles.title}>分析报告</Text>
-      <Text style={styles.uid}>ID: {currentResult.uid}</Text>
+      <Text style={styles.title}>掌纹分析报告</Text>
+      <Text style={styles.subtitle}>基于 AI 视觉识别与个性分析</Text>
 
-      {/* 雷达图 */}
-      <View style={styles.radarCard}>
-        <Text style={styles.sectionTitle}>特征图谱</Text>
-        <Svg width={150} height={150} viewBox="0 0 150 150">
-          {/* 底层网格 */}
-          {[0.25, 0.5, 0.75, 1].map((scale) => {
-            const gp = radarPoints(DIMS.map(() => scale * 100));
-            return (
-              <Polygon
-                key={scale}
-                points={gp.map((p) => `${p.x},${p.y}`).join(' ')}
-                fill="none"
-                stroke="rgba(0,241,254,0.1)"
-                strokeWidth="1"
-              />
-            );
-          })}
-          {/* 轴线 */}
-          {DIMS.map((_, i) => {
-            const angle = (Math.PI * 2 * i) / DIMS.length - Math.PI / 2;
-            return (
-              <Line
-                key={i}
-                x1={75} y1={75}
-                x2={75 + 60 * Math.cos(angle)}
-                y2={75 + 60 * Math.sin(angle)}
-                stroke="rgba(0,241,254,0.08)"
-                strokeWidth="1"
-              />
-            );
-          })}
-          {/* 数据面 */}
-          <Polygon
-            points={polyPoints}
-            fill="rgba(0,241,254,0.12)"
-            stroke={colors.cyan}
-            strokeWidth="1.5"
-          />
-          {/* 节点 */}
-          {pts.map((p, i) => (
-            <Circle key={i} cx={p.x} cy={p.y} r={3} fill={colors.cyan} />
-          ))}
-          <Circle cx={75} cy={75} r={4} fill={colors.purple} />
-        </Svg>
-
-        {/* 四维数值 */}
-        <View style={styles.dimGrid}>
-          {DIMS.map((d) => (
-            <View key={d} style={styles.dimCard}>
-              <Text style={styles.dimLabel}>{d}</Text>
-              <Text style={styles.dimValue}>{dims[d]}</Text>
-            </View>
-          ))}
+      {/* 免费区：开篇概述 */}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionIcon}>◉</Text>
+          <Text style={styles.sectionTitle}>开篇概述</Text>
         </View>
+        <Text style={styles.sectionText}>{result.intro}</Text>
       </View>
 
-      {/* 概述 */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.sectionTitle}>AI 概述</Text>
-        <Text style={styles.summaryText}>{currentResult.summary}</Text>
+      {/* 免费区：思维模式 */}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionIcon}>◎</Text>
+          <Text style={styles.sectionTitle}>思维模式</Text>
+        </View>
+        <Text style={styles.sectionText}>{result.mind}</Text>
       </View>
 
-      {/* 锁定详情 */}
-      {!currentResult.detail ? (
+      {/* 免费区：性格特质 */}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionIcon}>◆</Text>
+          <Text style={styles.sectionTitle}>性格特质</Text>
+        </View>
+        <Text style={styles.sectionText}>{result.heart}</Text>
+      </View>
+
+      {/* 锁定提示 */}
+      {result.lockedSections && result.lockedSections.length > 0 && (
         <View style={styles.lockCard}>
-          <Text style={styles.lockTitle}>完整报告已锁定</Text>
-          <Text style={styles.lockSub}>解锁后查看深度分析 · 8000+ 字解读</Text>
+          <Text style={styles.lockIcon}>🔒</Text>
+          <Text style={styles.lockTitle}>深度分析已锁定</Text>
+          <Text style={styles.lockDesc}>
+            解锁后查看完整报告，包括行为模式、健康指数、潜能分析、关系洞察等深度内容
+          </Text>
 
-          {isVip ? (
-            <TouchableOpacity style={styles.unlockBtn} onPress={handleUnlock}>
-              <Text style={styles.unlockBtnText}>解锁报告 ¥0.1</Text>
-            </TouchableOpacity>
+          {unlocking ? (
+            <ActivityIndicator size="small" color={colors.cyan} />
           ) : (
-            <View>
+            <View style={styles.unlockBtns}>
               <TouchableOpacity style={styles.unlockBtn} onPress={handleUnlock}>
-                <Text style={styles.unlockBtnText}>解锁报告 ¥0.1</Text>
+                <Text style={styles.unlockBtnText}>解锁完整报告 ¥0.1</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.vipBtn} onPress={handleUpgradeVip}>
-                <Text style={styles.vipBtnText}>升级 Pro · ¥9.9/月 · 无限次解锁</Text>
-              </TouchableOpacity>
+              
+              {!isVip && (
+                <TouchableOpacity style={styles.vipBtn} onPress={handleUpgradeVip}>
+                  <Text style={styles.vipBtnText}>升级 Pro · ¥9.9/月 · 无限次解锁</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
-      ) : (
-        <View style={styles.summaryCard}>
-          <Text style={styles.sectionTitle}>完整报告</Text>
-          <Text style={styles.summaryText}>{currentResult.detail}</Text>
+      )}
+
+      {/* 深度区：行为模式（需要解锁） */}
+      {isSectionUnlocked('action') && result.action && (
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>▸</Text>
+            <Text style={styles.sectionTitle}>行为模式</Text>
+          </View>
+          <Text style={styles.sectionText}>{result.action}</Text>
         </View>
       )}
+
+      {/* 深度区：健康指数（需要解锁） */}
+      {isSectionUnlocked('health') && result.health && (
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>✚</Text>
+            <Text style={styles.sectionTitle}>健康指数</Text>
+          </View>
+          <Text style={styles.sectionText}>{result.health}</Text>
+        </View>
+      )}
+
+      {/* 深度区：潜能分析（需要解锁） */}
+      {isSectionUnlocked('wealth') && result.wealth && (
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>☆</Text>
+            <Text style={styles.sectionTitle}>潜能分析</Text>
+          </View>
+          <Text style={styles.sectionText}>{result.wealth}</Text>
+        </View>
+      )}
+
+      {/* 深度区：关系洞察（需要解锁） */}
+      {isSectionUnlocked('emotion_deep') && result.emotion_deep && (
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>❤</Text>
+            <Text style={styles.sectionTitle}>关系洞察</Text>
+          </View>
+          <Text style={styles.sectionText}>{result.emotion_deep}</Text>
+        </View>
+      )}
+
+      {/* 深度区：趋势建议（需要解锁） */}
+      {isSectionUnlocked('future') && result.future && (
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>◈</Text>
+            <Text style={styles.sectionTitle}>趋势建议</Text>
+          </View>
+          <Text style={styles.sectionText}>{result.future}</Text>
+        </View>
+      )}
+
+      {/* 深度区：综合报告（需要解锁） */}
+      {isSectionUnlocked('summary') && result.summary && (
+        <View style={[styles.sectionCard, styles.summaryCard]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>◐</Text>
+            <Text style={styles.sectionTitle}>综合报告</Text>
+          </View>
+          <Text style={styles.sectionText}>{result.summary}</Text>
+        </View>
+      )}
+
+      {/* 底部间距 */}
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  content:   { padding: spacing.lg, paddingBottom: 60 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  content: {
+    padding: spacing.lg,
+    paddingBottom: 60,
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: typography.base,
+    textAlign: 'center',
+    marginTop: 100,
+  },
+  backBtn: {
+    marginTop: spacing.xl,
+    alignItems: 'center',
+  },
+  backBtnText: {
+    color: colors.cyan,
+    fontSize: typography.base,
+  },
   title: {
     color: colors.textPrimary,
     fontSize: typography.xl,
-    fontWeight: '600',
-    letterSpacing: 3,
+    fontWeight: '700',
+    letterSpacing: 2,
     textAlign: 'center',
     marginBottom: spacing.xs,
   },
-  uid: {
-    color: colors.textDim,
-    fontSize: typography.xs,
-    letterSpacing: 2,
+  subtitle: {
+    color: colors.textMuted,
+    fontSize: typography.sm,
     textAlign: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  sectionCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderCyan,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  sectionIcon: {
+    color: colors.cyan,
+    fontSize: typography.lg,
+    marginRight: spacing.sm,
   },
   sectionTitle: {
     color: colors.cyan,
-    fontSize: typography.sm,
-    letterSpacing: 3,
+    fontSize: typography.md,
     fontWeight: '600',
-    marginBottom: spacing.md,
+    letterSpacing: 2,
   },
-  radarCard: {
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderCyan,
-    padding: spacing.lg,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  dimGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  dimCard: {
-    backgroundColor: colors.bg,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.borderCyan,
-    padding: spacing.sm,
-    minWidth: 72,
-    alignItems: 'center',
-  },
-  dimLabel: { color: colors.textMuted, fontSize: typography.xs, letterSpacing: 1 },
-  dimValue: { color: colors.cyan, fontSize: typography.lg, fontWeight: '700', marginTop: 2 },
-  summaryCard: {
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderCyan,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  summaryText: {
+  sectionText: {
     color: colors.textPrimary,
     fontSize: typography.base,
     lineHeight: 24,
-    opacity: 0.85,
+    opacity: 0.9,
   },
   lockCard: {
     backgroundColor: colors.bgCard,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(208,188,255,0.2)',
+    borderColor: 'rgba(208,188,255,0.3)',
     padding: spacing.xl,
     alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  lockIcon: {
+    fontSize: 40,
     marginBottom: spacing.md,
   },
   lockTitle: {
     color: colors.purple,
     fontSize: typography.md,
-    fontWeight: '600',
+    fontWeight: '700',
     letterSpacing: 2,
+    marginBottom: spacing.sm,
   },
-  lockSub: {
+  lockDesc: {
     color: colors.textMuted,
     fontSize: typography.sm,
-    marginTop: spacing.xs,
-    marginBottom: spacing.lg,
     textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  unlockBtns: {
+    width: '100%',
   },
   unlockBtn: {
     backgroundColor: 'rgba(0,241,254,0.08)',
@@ -263,15 +299,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  unlockBtnText: { color: colors.cyan, fontSize: typography.base, fontWeight: '600' },
+  unlockBtnText: {
+    color: colors.cyan,
+    fontSize: typography.base,
+    fontWeight: '600',
+  },
   vipBtn: {
     backgroundColor: 'rgba(208,188,255,0.08)',
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: 'rgba(208,188,255,0.2)',
+    borderColor: 'rgba(208,188,255,0.3)',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
   },
-  vipBtnText: { color: colors.purple, fontSize: typography.sm },
+  vipBtnText: {
+    color: colors.purple,
+    fontSize: typography.sm,
+    fontWeight: '600',
+  },
+  summaryCard: {
+    borderColor: 'rgba(0,241,254,0.3)',
+    backgroundColor: 'rgba(0,241,254,0.03)',
+  },
 });

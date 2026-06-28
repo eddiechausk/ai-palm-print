@@ -1,13 +1,12 @@
 /**
- * cloud.ts — 云函数调用（简化版）
- * 使用 axios 直接调用云函数 HTTP 接口
+ * cloud.ts — 云函数调用（HTTP 网关版）
+ * 使用 axios 通过 HTTP 网关调用云函数
  */
 
 import axios from 'axios';
 
-// CloudBase 云函数 HTTP 触发器地址（需要先在控制台开启）
-// 格式: https://{env-id}.service.tcloudbase.com/{function-name}
-const CLOUD_FUNCTION_BASE = 'https://cloud1-d4gtuqrxoa3005eeb.service.tcloudbase.com';
+// CloudBase 云函数 HTTP 网关地址
+const HTTP_GATEWAY_BASE = 'https://cloud1-d4gtuqrxoa3005eeb-1429070952.ap-shanghai.app.tcloudbase.com';
 
 /** 调用云函数 */
 export async function callFunction<T = unknown>(
@@ -21,8 +20,8 @@ export async function callFunction<T = unknown>(
       return mockCallFunction<T>(name, data);
     }
 
-    // 生产模式：调用真实云函数
-    const url = `${CLOUD_FUNCTION_BASE}/${name}`;
+    // 生产模式：通过 HTTP 网关调用云函数
+    const url = `${HTTP_GATEWAY_BASE}/${name}`;
     console.log('调用云函数:', url, data);
 
     const response = await axios.post(url, data, {
@@ -31,6 +30,15 @@ export async function callFunction<T = unknown>(
         'Content-Type': 'application/json',
       },
     });
+
+    // HTTP 网关返回格式: { statusCode, body }
+    // body 是 JSON 字符串，需要解析
+    if (response.data && response.data.statusCode) {
+      const body = typeof response.data.body === 'string' 
+        ? JSON.parse(response.data.body) 
+        : response.data.body;
+      return body as T;
+    }
 
     return response.data as T;
   } catch (error: any) {
