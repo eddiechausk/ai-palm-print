@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+build/
+.gradle/
+*.apk
+*.ap_
+*.dex
+
+# Gradle home (should not be committed)
+android/.gradle-home/
+
+# Local Maven repo (let build server download from Maven Central)
+local-maven/
+
+# Local configuration
+.env
+.local
+.gradlent/
+
+# Metro
+.metro-health-check*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# React Native
+.expo/
+.expo-shared/
+
+# Android specific
+# jdk17/ and android-sdk/ excluded - install on build server
+jdk17/
+android-sdk/
+
+# Build logs and backups
+*.log
+*.bak
+*.min
+
+# Gradle build directory (inside android/)
+android/app/build/
+android/.gradle/
+
+# Windows-only tools (not needed on CI)
+android/.gradle-home/
+
+# iOS (not needed for Android build)
+ios/
+Pods/
