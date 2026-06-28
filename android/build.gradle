@@ -6,6 +6,7 @@ buildscript {
         targetSdkVersion = 34
         ndkVersion = "25.1.8937393"
         kotlinVersion = "1.8.0"
+        reactNativeVersion = "0.73.6"
     }
     repositories {
         google()
@@ -13,7 +14,6 @@ buildscript {
     }
     dependencies {
         classpath("com.android.tools.build:gradle:8.1.1")
-        // React Native Gradle Plugin is provided via includeBuild in settings.gradle
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.0")
     }
 }
@@ -21,11 +21,9 @@ buildscript {
 allprojects {
     repositories {
         maven {
-            // React Native from node_modules
             url("$rootDir/../node_modules/react-native/android")
         }
         maven {
-            // JSC for Android
             url("$rootDir/../node_modules/jsc-android/dist")
         }
         mavenCentral {
@@ -39,14 +37,24 @@ allprojects {
 }
 
 subprojects { subproject ->
-    subproject.plugins.withId('com.android.library') {
-        subproject.android {
-            buildToolsVersion rootProject.ext.buildToolsVersion
+    afterEvaluate { project ->
+        if (project.hasProperty("android")) {
+            android {
+                buildToolsVersion rootProject.ext.buildToolsVersion
+                compileSdk rootProject.ext.compileSdkVersion
+            }
         }
     }
-    subproject.plugins.withId('com.android.application') {
-        subproject.android {
-            buildToolsVersion rootProject.ext.buildToolsVersion
+
+    configurations.all {
+        resolutionStrategy {
+            force "com.facebook.react:react-android:${rootProject.ext.reactNativeVersion}"
+            force "com.facebook.react:hermes-android:${rootProject.ext.reactNativeVersion}"
+        }
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == 'com.facebook.react' && details.requested.name == 'react-native') {
+                details.useTarget group: 'com.facebook.react', name: 'react-android', version: rootProject.ext.reactNativeVersion
+            }
         }
     }
 }
