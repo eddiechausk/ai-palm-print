@@ -1,24 +1,23 @@
 apply plugin: "com.android.application"
-apply plugin: "com.facebook.react"
 
 /**
- * React Native Plugin Configuration
- * On Linux CI: com.facebook.react plugin works correctly via includeBuild in settings.gradle
- * The plugin auto-adds react-android and hermes-android dependencies
+ * React Native: manual dependency approach (no com.facebook.react plugin)
+ * The plugin via includeBuild is unreliable on CI runners.
+ * Dependencies are added manually below.
  */
-react {
-    // Let the plugin auto-detect root and reactNativeDir from project structure
-    // hermesEnabled is read from gradle.properties
-}
+project.ext.react = [
+    enableHermes: true,
+    root: "../../"
+]
 
 android {
     namespace "com.palmai.app"
-    compileSdk 34
+    compileSdk rootProject.ext.compileSdkVersion
 
     defaultConfig {
         applicationId "com.palmai.app"
-        minSdk 23
-        targetSdk 34
+        minSdk rootProject.ext.minSdkVersion
+        targetSdk rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
     }
@@ -47,7 +46,9 @@ android {
 }
 
 dependencies {
-    // react-android and hermes-android are auto-added by com.facebook.react plugin
+    // React Native core
+    implementation "com.facebook.react:react-android"
+    implementation "com.facebook.react:hermes-android"
 }
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
