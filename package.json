@@ -14,6 +14,7 @@
     "postinstall": "node scripts/fix-android-namespaces.js"
   },
   "dependencies": {
+    "@cloudbase/js-sdk": "^3.5.4",
     "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.17",
