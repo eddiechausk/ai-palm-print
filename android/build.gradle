@@ -40,6 +40,12 @@ subprojects { subproject ->
                 compileSdk rootProject.ext.compileSdkVersion
             }
         }
+        // Fix Kotlin/Java JVM target mismatch in third-party libraries
+        project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
 
     configurations.all {
