@@ -57,6 +57,17 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      # ── Inject auto-increment version from CI run number ──
+      - name: Set version from CI run number
+        run: |
+          VERSION_CODE=${{ github.run_number }}
+          VERSION_NAME="1.0.${VERSION_CODE}"
+          echo "Version: ${VERSION_NAME} (code: ${VERSION_CODE})"
+          sed -i "s/versionCode .*/versionCode ${VERSION_CODE}/" android/app/build.gradle
+          sed -i "s/versionName \".*\"/versionName \"${VERSION_NAME}\"/" android/app/build.gradle
+          echo "=== Updated build.gradle ==="
+          grep -E "versionCode|versionName" android/app/build.gradle
+
       # ── Generate JS bundle for Release (Metro bundler) ──
       - name: Clean assets & create directories
         run: |

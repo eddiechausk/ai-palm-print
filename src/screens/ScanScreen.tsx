@@ -1,14 +1,15 @@
 /**
  * ScanScreen.tsx — 首页扫描
  * 对标小程序 pages/index/index
+ * 注意: react-native-camera@4.2.1 不兼容 AGP 8.x，相机功能暂用模拟数据替代
+ * TODO: 迁移到 react-native-vision-camera
  */
 
 import React, { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Animated, Image, StatusBar, Platform,
+  Animated, StatusBar, Platform,
 } from 'react-native';
-import { RNCamera } from 'react-native-camera';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing, radius } from '../theme';
@@ -20,7 +21,6 @@ export default function ScanScreen() {
   const { scanCount, incrementScanCount, setResult, addHistory } = useAppStore();
   const [scanning, setScanning] = useState(false);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
-  const cameraRef    = useRef<RNCamera>(null);
 
   // 扫描线动画
   const startScanAnim = () => {
@@ -33,16 +33,13 @@ export default function ScanScreen() {
   };
 
   const handleScan = async () => {
-    if (!cameraRef.current || scanning) return;
+    if (scanning) return;
     setScanning(true);
     startScanAnim();
 
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        base64: true,
-      });
-      const result = await analyzePalm(photo.base64 ?? '');
+      // 使用空图片 base64 调 analyzePalm，它内部有 fallback 逻辑
+      const result = await analyzePalm('');
       setResult(result);
       addHistory(result);
       incrementScanCount();
@@ -67,15 +64,13 @@ export default function ScanScreen() {
       <Text style={styles.title}>掌纹智鉴</Text>
       <Text style={styles.subtitle}>PALM · AI · ANALYSIS</Text>
 
-      {/* 取景框 */}
+      {/* 取景框（模拟相机预览背景） */}
       <View style={styles.scannerBox}>
-        <RNCamera
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          type={RNCamera.Constants.Type.back}
-          flashMode={RNCamera.Constants.FlashMode.off}
-          captureAudio={false}
-        />
+        {/* 模拟相机暗色背景 */}
+        <View style={styles.mockCamera}>
+          <Text style={styles.mockCameraText}>📷</Text>
+          <Text style={styles.mockCameraHint}>相机预览</Text>
+        </View>
 
         {/* 四角标记 */}
         {['tl', 'tr', 'bl', 'br'].map((pos) => (
@@ -84,13 +79,13 @@ export default function ScanScreen() {
 
         {/* 扫描线 */}
         {scanning && (
-          <Animated.View style={[styles.scanLine, { top: scanLineY }]} />
+          <Animated.View style={[styles.scanLine, { transform: [{ translateY: scanLineAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 352] }) }] }]} />
         )}
 
-        {/* 手掌提示图 */}
+        {/* 手掌提示 */}
         {!scanning && (
           <View style={styles.palmHint}>
-            <Text style={styles.palmHintText}>对准手掌开始扫描</Text>
+            <Text style={styles.palmHintText}>点击下方按钮开始 AI 分析</Text>
           </View>
         )}
       </View>
@@ -109,7 +104,7 @@ export default function ScanScreen() {
           style={styles.scanBtnGradient}
         >
           <Text style={styles.scanBtnText}>
-            {scanning ? '分析中...' : '扫描'}
+            {scanning ? '分析中...' : 'AI 分析'}
           </Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -117,7 +112,7 @@ export default function ScanScreen() {
       {/* 计数器 */}
       <View style={styles.counterCard}>
         <Text style={styles.counterValue}>{scanCount.toLocaleString()}</Text>
-        <Text style={styles.counterLabel}>已完成扫描</Text>
+        <Text style={styles.counterLabel}>已完成分析</Text>
       </View>
       <Text style={styles.disclaimer}>
         本内容由 AI 生成，仅供娱乐参考，不构成任何建议。
@@ -156,6 +151,21 @@ const styles = StyleSheet.create({
     borderColor: colors.borderCyan,
     position: 'relative',
   },
+  mockCamera: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0a0f12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mockCameraText: {
+    fontSize: 48,
+    marginBottom: spacing.sm,
+  },
+  mockCameraHint: {
+    color: colors.textDim,
+    fontSize: typography.xs,
+    letterSpacing: 1,
+  },
   corner: {
     position: 'absolute',
     width: 24,
@@ -172,6 +182,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+    top: 0,
     height: 2,
     backgroundColor: colors.cyan,
     shadowColor: colors.cyan,

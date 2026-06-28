@@ -6,6 +6,10 @@
  */
 module.exports = {
   dependencies: {
+    // react-native-camera@4.2.1 完全不兼容 AGP 8.x + RN 0.73（flavor dimensions 错误）
+    'react-native-camera': {
+      platforms: { android: null },
+    },
     'react-native-iap': {
       platforms: { android: null },
     },
