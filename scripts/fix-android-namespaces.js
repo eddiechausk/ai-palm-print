@@ -8,6 +8,7 @@
  * Libraries that need fixing:
  * - react-native-linear-gradient
  * - react-native-reanimated
+ * - react-native-camera (also strips productFlavors to avoid MissingValueException)
  */
 
 const fs = require('fs');
@@ -26,6 +27,13 @@ const fixes = [
     namespace: 'com.swmansion.reanimated',
     packageName: 'com.swmansion.reanimated',
   },
+  {
+    gradleFile: 'node_modules/react-native-camera/android/build.gradle',
+    manifestFile: 'node_modules/react-native-camera/android/src/main/AndroidManifest.xml',
+    namespace: 'org.reactnative.camera',
+    packageName: 'org.reactnative.camera',
+    stripFlavors: true,
+  },
 ];
 
 const root = path.resolve(__dirname, '..');
@@ -36,14 +44,12 @@ function addNamespaceToGradle(filePath, ns) {
   let content = fs.readFileSync(filePath, 'utf8');
   if (content.includes(`namespace "${ns}"`)) return false;
 
-  // Insert namespace after 'android {' block opening
   const match = content.match(/^(android\s*\{)/m);
   if (match) {
     content = content.replace(/^(android\s*\{)/m, `$1\n    namespace "${ns}"`);
     fs.writeFileSync(filePath, content, 'utf8');
     return true;
   }
-  // If no android block found, prepend
   content = `android {\n    namespace "${ns}"\n}\n\n` + content;
   fs.writeFileSync(filePath, content, 'utf8');
   return true;
@@ -59,6 +65,29 @@ function removePackageFromManifest(filePath, pkgName) {
   return true;
 }
 
+function stripProductFlavors(filePath) {
+  if (!fs.existsSync(filePath)) return false;
+  let content = fs.readFileSync(filePath, 'utf8');
+
+  // Remove flavorDimensions line
+  const hadDimensions = /\s*\n\s*flavorDimensions\s+"[^"]+"\s*\n/.test(content);
+  content = content.replace(/\s*\n\s*flavorDimensions\s+"[^"]+"\s*\n/, '\n');
+
+  // Remove productFlavors block
+  const hadFlavors = content.includes('productFlavors');
+  content = content.replace(/\n\s*\n\s*productFlavors\s*\{[\s\S]*?\n\s*\}\s*\n/, '\n');
+
+  // Convert flavor-specific dependencies to regular implementation
+  content = content.replace(/generalImplementation /g, 'implementation ');
+  content = content.replace(/mlkitImplementation /g, 'implementation ');
+
+  if (hadDimensions || hadFlavors) {
+    fs.writeFileSync(filePath, content, 'utf8');
+    return true;
+  }
+  return false;
+}
+
 for (const fix of fixes) {
   const gradlePath = path.join(root, fix.gradleFile);
   const manifestPath = path.join(root, fix.manifestFile);
@@ -69,6 +98,11 @@ for (const fix of fixes) {
     fixed = true;
   } else {
     console.log(`[fix-ns] OK: ${fix.gradleFile}`);
+  }
+
+  if (fix.stripFlavors && stripProductFlavors(gradlePath)) {
+    console.log(`[fix-ns] -flavors: ${fix.gradleFile}`);
+    fixed = true;
   }
 
   if (removePackageFromManifest(manifestPath, fix.packageName)) {
