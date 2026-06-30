@@ -1,10 +1,13 @@
 apply plugin: "com.android.application"
-apply plugin: "com.facebook.react"
 
-react {
-    // Hermes JS engine (default: true for RN 0.73)
-    hermesEnabled = true
-}
+/**
+ * React Native: manual dependency approach
+ * react-android:0.73.6 exists on Maven Central with variant-aware GMM
+ */
+project.ext.react = [
+    enableHermes: true,
+    root: "../../"
+]
 
 android {
     namespace "com.palmai.app"
@@ -47,8 +50,8 @@ android {
 }
 
 dependencies {
-    // The com.facebook.react plugin adds react-android and hermes-android automatically
-    // via includeBuild, so we don't need to specify them manually
+    implementation "com.facebook.react:react-android:${rootProject.ext.reactNativeVersion}"
+    implementation "com.facebook.react:hermes-android:${rootProject.ext.reactNativeVersion}"
 }
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
