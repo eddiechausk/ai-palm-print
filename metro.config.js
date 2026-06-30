@@ -1,4 +1,5 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const path = require('path');
 
 const defaultConfig = getDefaultConfig(__dirname);
 
@@ -10,6 +11,14 @@ const config = {
         inlineRequires: true,
       },
     }),
+  },
+  resolver: {
+    // 屏蔽 bson/mongodb 等不兼容 React Native 的包
+    // 这些包使用了 Static class blocks 等 Node.js 特有语法
+    blockList: [
+      /node_modules\/bson\/.*/,
+      /node_modules\/mongodb\/.*/,
+    ],
   },
 };
 
