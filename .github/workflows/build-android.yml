@@ -71,7 +71,6 @@ jobs:
       # ── Generate JS bundle for Release (Metro bundler) ──
       - name: Clean assets & create directories
         run: |
-          # Remove stale Metro-generated drawables to avoid resource conflicts
           rm -rf android/app/src/main/res/drawable-*
           rm -rf android/app/src/main/res/raw
           mkdir -p android/app/src/main/assets
@@ -103,5 +102,47 @@ jobs:
           APK="android/app/build/outputs/apk/release/app-release.apk"
           if [ -f "$APK" ]; then
             ls -lh "$APK"
-            echo "✅ Release APK 构建成功！JS Bundle 已打包，无需开发服务器即可运行！"
+            echo "✅ Release APK 构建成功！"
           fi
+
+  # ── Deploy CloudBase Function ──
+  deploy-cloud:
+    name: Deploy Cloud Functions
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ secrets.TCB_SECRET_ID != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install CloudBase CLI
+        run: npm install -g @cloudbase/cli
+
+      - name: Deploy analyzePalm function
+        env:
+          TCB_SECRET_ID: ${{ secrets.TCB_SECRET_ID }}
+          TCB_SECRET_KEY: ${{ secrets.TCB_SECRET_KEY }}
+        run: |
+          echo "🚀 正在部署云函数 analyzePalm..."
+          
+          # 安装云函数依赖
+          cd cloudfunctions/analyzePalm
+          npm install
+          cd ../..
+          
+          # 登录 CloudBase
+          tcb login --apiKeyId "$TCB_SECRET_ID" --apiKey "$TCB_SECRET_KEY"
+          
+          # 部署云函数
+          tcb fn deploy analyzePalm \
+            --envId cloud1-d4gtuqrxoa3005eeb \
+            --dir cloudfunctions/analyzePalm \
+            --force
+          
+          echo "✅ 云函数部署完成！"
