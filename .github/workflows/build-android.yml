@@ -99,29 +99,5 @@ jobs:
           APK="android/app/build/outputs/apk/release/app-release.apk"
           if [ -f "$APK" ]; then
             ls -lh "$APK"
-            echo "Release APK built successfully!"
+            echo "Release APK built successfully! 在 Actions 页面下载 APK。"
           fi
-
-      - name: Deploy analyzePalm cloud function
-        continue-on-error: true
-        env:
-          TCB_SECRET_ID: ${{ secrets.TCB_SECRET_ID }}
-          TCB_SECRET_KEY: ${{ secrets.TCB_SECRET_KEY }}
-        run: |
-          if [ -z "$TCB_SECRET_ID" ] || [ -z "$TCB_SECRET_KEY" ]; then
-            echo "Skip: TCB_SECRET_ID or TCB_SECRET_KEY not configured"
-            exit 0
-          fi
-          
-          echo "Deploying analyzePalm cloud function..."
-          npm install -g @cloudbase/cli
-          
-          cd cloudfunctions/analyzePalm && npm install && cd ../..
-          
-          tcb login --apiKeyId "$TCB_SECRET_ID" --apiKey "$TCB_SECRET_KEY"
-          tcb fn deploy analyzePalm \
-            --envId cloud1-d4gtuqrxoa3005eeb \
-            --dir cloudfunctions/analyzePalm \
-            --force
-          
-          echo "Cloud function deployed!"

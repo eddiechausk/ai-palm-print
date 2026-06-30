@@ -1,60 +1,46 @@
-# Dependencies
+# 依赖
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# Build outputs
+# 构建产物
 build/
-.gradle/
+dist/
 *.apk
-*.ap_
-*.dex
 
-# Gradle home (should not be committed)
+# Android
+android/build/
+android/app/build/
+android/app/src/main/assets/
+android/app/src/main/res/drawable-*/
+android/app/src/main/res/raw/
 android/.gradle-home/
 
-# Local Maven repo (let build server download from Maven Central)
-local-maven/
+# iOS
+ios/build/
+ios/Pods/
 
-# Local configuration
-.env
-.local
-.gradlent/
+# 日志
+*.log
+npm-debug.log*
 
-# Metro
-.metro-health-check*
-
-# OS files
-.DS_Store
-Thumbs.db
+# 缓存
+.cache/
+*.cache
+.gradle/
 
 # IDE
 .vscode/
 .idea/
-*.iml
+*.swp
+*.swo
 
-# React Native
-.expo/
-.expo-shared/
+# 系统
+.DS_Store
+Thumbs.db
 
-# Android specific
-# jdk17/ and android-sdk/ excluded - install on build server
-jdk17/
-android-sdk/
+# 测试
+coverage/
+*.test.js
 
-# Build logs and backups
-*.log
-*.bak
-*.min
-
-# Gradle build directory (inside android/)
-android/app/build/
-android/.gradle/
-
-# Windows-only tools (not needed on CI)
-android/.gradle-home/
-
-# iOS (not needed for Android build)
-ios/
-Pods/
+# 临时文件
+tmp/
+temp/
