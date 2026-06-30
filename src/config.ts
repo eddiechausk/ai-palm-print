@@ -8,7 +8,7 @@
 // 获取地址: https://dashscope.aliyun.com/
 // 此 Key 用于 AI 掌纹分析，不会被用户看到
 // ==============================================================
-export const DASHSCOPE_API_KEY = 'your_dashscope_api_key_here';
+export const DASHSCOPE_API_KEY = 'sk-8b9bfc6b3cef4a1989492fa5ff11adff';
 
 // DashScope API 地址（默认无需修改）
 export const DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
